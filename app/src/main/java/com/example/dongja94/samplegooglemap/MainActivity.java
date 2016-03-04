@@ -171,6 +171,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         map.setOnCameraChangeListener(this);
         map.setOnMarkerClickListener(this);
         map.setOnInfoWindowClickListener(this);
+        map.setInfoWindowAdapter(new MyInfoWindowAdapter(this, poiResolver));
 //        map.getUiSettings().setScrollGesturesEnabled(false);
     }
 
