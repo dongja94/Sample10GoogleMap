@@ -12,17 +12,30 @@ import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.View;
+import android.widget.Button;
+import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
+import java.util.HashMap;
+import java.util.Map;
+
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback ,
+        GoogleMap.OnCameraChangeListener,
+        GoogleMap.OnMarkerClickListener,
+        GoogleMap.OnInfoWindowClickListener {
 
     GoogleMap map;
     LocationManager mLM;
@@ -47,7 +60,39 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map_fragment);
         mapFragment.getMapAsync(this);
 
+        Button btn = (Button)findViewById(R.id.btn_marker);
+        btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (map == null) return;
+                CameraPosition postion = map.getCameraPosition();
+                POIItem item = new POIItem();
+                item.title = "MyMarker";
+                item.subtitle = "marker test";
+                item.description = "marker description";
+                addMarker(postion.target, item);
+            }
+        });
+
         mLM = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+    }
+
+    Map<POIItem, Marker> markerResolver = new HashMap<>();
+    Map<Marker, POIItem> poiResolver = new HashMap<>();
+
+    private void addMarker(LatLng position, POIItem data) {
+        MarkerOptions options = new MarkerOptions();
+        options.position(position);
+        BitmapDescriptor icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_CYAN);
+        options.icon(icon);
+        options.anchor(0.5f, 1);
+        options.title(data.title);
+        options.snippet(data.subtitle);
+        options.draggable(true);
+
+        Marker marker = map.addMarker(options);
+        markerResolver.put(data, marker);
+        poiResolver.put(marker, data);
     }
 
     @Override
@@ -102,15 +147,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             return;
         }
 
-        CameraPosition position = new CameraPosition.Builder()
-                .target(new LatLng(lat, lng))
-                .zoom(17)
-                .bearing(15)
-                .tilt(30)
-                .build();
+//        CameraPosition position = new CameraPosition.Builder()
+//                .target(new LatLng(lat, lng))
+//                .zoom(17)
+//                .bearing(15)
+//                .tilt(30)
+//                .build();
+//        CameraUpdate update = CameraUpdateFactory.newCameraPosition(position);
 
-//        CameraUpdate update = CameraUpdateFactory.newLatLngZoom(new LatLng(lat, lng), 17);
-        CameraUpdate update = CameraUpdateFactory.newCameraPosition(position);
+        CameraUpdate update = CameraUpdateFactory.newLatLngZoom(new LatLng(lat, lng), 17);
         map.moveCamera(update);
     }
 
@@ -123,6 +168,29 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
         map.setMyLocationEnabled(true);
         map.getUiSettings().setZoomControlsEnabled(true);
+        map.setOnCameraChangeListener(this);
+        map.setOnMarkerClickListener(this);
+        map.setOnInfoWindowClickListener(this);
 //        map.getUiSettings().setScrollGesturesEnabled(false);
+    }
+
+    private static final String TAG = "MainActivity";
+    @Override
+    public void onCameraChange(CameraPosition cameraPosition) {
+        Log.i(TAG, "camera change");
+    }
+
+    @Override
+    public boolean onMarkerClick(Marker marker) {
+        POIItem item = poiResolver.get(marker);
+        Toast.makeText(this, "description : " + item.description, Toast.LENGTH_SHORT).show();
+        marker.showInfoWindow();
+        return true;
+    }
+
+    @Override
+    public void onInfoWindowClick(Marker marker) {
+        Toast.makeText(this, "info window click", Toast.LENGTH_SHORT).show();
+        marker.hideInfoWindow();
     }
 }
