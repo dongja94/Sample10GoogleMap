@@ -12,9 +12,14 @@ import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ListView;
 import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdate;
@@ -32,6 +37,8 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import java.util.HashMap;
 import java.util.Map;
 
+import okhttp3.Request;
+
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback ,
         GoogleMap.OnCameraChangeListener,
         GoogleMap.OnMarkerClickListener,
@@ -40,6 +47,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     GoogleMap map;
     LocationManager mLM;
     String mProvider = LocationManager.GPS_PROVIDER;
+    EditText keywordView;
+    ListView listView;
+    ArrayAdapter<POIItem> mAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,6 +70,30 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map_fragment);
         mapFragment.getMapAsync(this);
 
+        keywordView = (EditText)findViewById(R.id.edit_keyword);
+        listView = (ListView)findViewById(R.id.listView);
+        mAdapter = new ArrayAdapter<POIItem>(this, android.R.layout.simple_list_item_1);
+        listView.setAdapter(mAdapter);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                POIItem item = (POIItem) listView.getItemAtPosition(position);
+                final Marker marker = markerResolver.get(item);
+                CameraUpdate update = CameraUpdateFactory.newLatLng(marker.getPosition());
+                map.animateCamera(update, new GoogleMap.CancelableCallback() {
+                    @Override
+                    public void onFinish() {
+                       marker.showInfoWindow();
+                    }
+
+                    @Override
+                    public void onCancel() {
+
+                    }
+                });
+            }
+        });
+
         Button btn = (Button)findViewById(R.id.btn_marker);
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -74,7 +108,40 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         });
 
+        btn = (Button)findViewById(R.id.btn_search);
+        btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String keyword = keywordView.getText().toString();
+                if (!TextUtils.isEmpty(keyword)) {
+                    NetworkManager.getInstance().getTmapPOI(MainActivity.this, keyword, new NetworkManager.OnResultListener<TMapPOIList>() {
+                        @Override
+                        public void onSuccess(Request request, TMapPOIList result) {
+                            clearAllMarker();
+                            for (POIItem item : result.pois.poi) {
+                                LatLng latLng = new LatLng(item.latitude, item.longitude);
+                                addMarker(latLng, item);
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(Request request, int code, Throwable cause) {
+
+                        }
+                    });
+                }
+            }
+        });
         mLM = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+    }
+
+    private void clearAllMarker() {
+        for (int i = 0; i < mAdapter.getCount(); i++) {
+            POIItem item = mAdapter.getItem(i);
+            Marker marker = markerResolver.get(item);
+            marker.remove();
+        }
+        mAdapter.clear();
     }
 
     Map<POIItem, Marker> markerResolver = new HashMap<>();
@@ -93,6 +160,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Marker marker = map.addMarker(options);
         markerResolver.put(data, marker);
         poiResolver.put(marker, data);
+        mAdapter.add(data);
     }
 
     @Override
