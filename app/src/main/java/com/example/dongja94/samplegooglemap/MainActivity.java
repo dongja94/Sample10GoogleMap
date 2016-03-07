@@ -3,6 +3,7 @@ package com.example.dongja94.samplegooglemap;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -20,6 +21,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.RadioGroup;
 import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdate;
@@ -33,6 +35,7 @@ import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PolylineOptions;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -50,6 +53,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     EditText keywordView;
     ListView listView;
     ArrayAdapter<POIItem> mAdapter;
+    RadioGroup typeView;
+
+    POIItem start, end;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,6 +76,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map_fragment);
         mapFragment.getMapAsync(this);
 
+        typeView = (RadioGroup)findViewById(R.id.group_type);
         keywordView = (EditText)findViewById(R.id.edit_keyword);
         listView = (ListView)findViewById(R.id.listView);
         mAdapter = new ArrayAdapter<POIItem>(this, android.R.layout.simple_list_item_1);
@@ -132,7 +139,48 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
             }
         });
+
+        btn = (Button)findViewById(R.id.btn_route);
+        btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (start != null && end != null) {
+                    NetworkManager.getInstance().getCarRouteInfo(MainActivity.this, start.latitude, start.longitude, end.latitude, end.longitude,
+                            new NetworkManager.OnResultListener<CarRouteInfo>(){
+                                @Override
+                                public void onSuccess(Request request, CarRouteInfo result) {
+                                    displayRoute(result);
+                                }
+
+                                @Override
+                                public void onFailure(Request request, int code, Throwable cause) {
+
+                                }
+                            });
+                } else {
+                    Toast.makeText(MainActivity.this, "start or end is null", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
         mLM = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+    }
+
+    private void displayRoute(CarRouteInfo info) {
+        PolylineOptions options = new PolylineOptions();
+        for (CarFeature feature : info.features) {
+            if (feature.geometry.type.equals("LineString")) {
+                for (int i = 0; i < feature.geometry.coordinates.length; i+=2) {
+                    LatLng latLng = new LatLng(feature.geometry.coordinates[i+1], feature.geometry.coordinates[i]);
+                    options.add(latLng);
+                }
+            }
+        }
+        int totalTime = info.features.get(0).properties.totalTime;
+        int totalDistance = info.features.get(0).properties.totalDistance;
+        options.color(Color.RED);
+        options.width(10);
+        map.addPolyline(options);
+        Toast.makeText(this, "total : " + totalTime + "," + totalDistance,Toast.LENGTH_SHORT).show();
     }
 
     private void clearAllMarker() {
@@ -260,6 +308,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     public void onInfoWindowClick(Marker marker) {
         Toast.makeText(this, "info window click", Toast.LENGTH_SHORT).show();
+        POIItem item = poiResolver.get(marker);
+        switch (typeView.getCheckedRadioButtonId()) {
+            case R.id.radio_start :
+                start = item;
+                break;
+            case R.id.radio_end :
+                end = item;
+                break;
+        }
         marker.hideInfoWindow();
     }
 }

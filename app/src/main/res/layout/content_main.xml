@@ -31,6 +31,36 @@
                 android:layout_height="wrap_content"
                 android:text="m"
                 android:id="@+id/btn_marker" />
+
+            <RadioGroup
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:id="@+id/group_type"
+                android:layout_gravity="center_vertical">
+
+                <RadioButton
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="start"
+                    android:id="@+id/radio_start"
+                    android:checked="true" />
+
+                <RadioButton
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="end"
+                    android:id="@+id/radio_end"
+                    android:checked="false" />
+            </RadioGroup>
+
+            <Button
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="route"
+                android:id="@+id/btn_route" />
+
         </LinearLayout>
 
         <LinearLayout

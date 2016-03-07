@@ -6,6 +6,7 @@ import android.os.Looper;
 import android.os.Message;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,9 +34,11 @@ import okhttp3.Cache;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.Dispatcher;
+import okhttp3.FormBody;
 import okhttp3.JavaNetCookieJar;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /**
@@ -185,13 +188,71 @@ public class NetworkManager {
 
     public Request getTmapPOI(Context context, String keyword, final OnResultListener<TMapPOIList> listener) {
         try {
-            String url = String.format(URL_TMAP_POI, URLEncoder.encode(keyword,"utf-8"));
-        final CallbackObject<TMapPOIList> callbackObject = new CallbackObject<TMapPOIList>();
+            String url = String.format(URL_TMAP_POI, URLEncoder.encode(keyword, "utf-8"));
+            final CallbackObject<TMapPOIList> callbackObject = new CallbackObject<TMapPOIList>();
+
+            Request request = new Request.Builder().url(url)
+                    .header("Accept", "application/json")
+                    .header("appKey", "6aeffc95-8ebc-3f73-92e9-8a4d8f797c6b")
+                    .tag(context)
+                    .build();
+
+            callbackObject.request = request;
+            callbackObject.listener = listener;
+            mClient.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    callbackObject.exception = e;
+                    Message msg = mHandler.obtainMessage(MESSAGE_FAILURE, callbackObject);
+                    mHandler.sendMessage(msg);
+                }
+
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+                    Gson gson = new Gson();
+                    TMapPOISearchResult result = gson.fromJson(response.body().charStream(), TMapPOISearchResult.class);
+                    for (POIItem item : result.searchPoiInfo.pois.poi) {
+                        item.updatePOIData();
+                    }
+                    callbackObject.result = result.searchPoiInfo;
+//                XMLParser parser = new XMLParser();
+//                NaverMovies movies = parser.fromXml(response.body().byteStream(), "channel", NaverMovies.class);
+//                callbackObject.result = movies;
+                    Message msg = mHandler.obtainMessage(MESSAGE_SUCCESS, callbackObject);
+                    mHandler.sendMessage(msg);
+                }
+            });
+
+            return request;
+
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private static final String URL_ROUTE_CAR = "https://apis.skplanetx.com/tmap/routes?version=1";
+
+
+    public Request getCarRouteInfo(Context context, double startLat, double startLng, double endLat, double endLng,
+                                   final OnResultListener<CarRouteInfo> listener) {
+        String url = URL_ROUTE_CAR;
+        final CallbackObject<CarRouteInfo> callbackObject = new CallbackObject<CarRouteInfo>();
+
+        RequestBody body = new FormBody.Builder()
+                .add("startX", ""+startLng)
+                .add("startY", "" + startLat)
+                .add("endX","" + endLng)
+                .add("endY","" + endLat)
+                .add("resCoordType","WGS84GEO")
+                .add("reqCoordType","WGS84GEO")
+                .build();
 
         Request request = new Request.Builder().url(url)
                 .header("Accept", "application/json")
                 .header("appKey", "6aeffc95-8ebc-3f73-92e9-8a4d8f797c6b")
                 .tag(context)
+                .post(body)
                 .build();
 
         callbackObject.request = request;
@@ -206,15 +267,9 @@ public class NetworkManager {
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                Gson gson = new Gson();
-                TMapPOISearchResult result = gson.fromJson(response.body().charStream(), TMapPOISearchResult.class);
-                for (POIItem item : result.searchPoiInfo.pois.poi) {
-                    item.updatePOIData();
-                }
-                callbackObject.result = result.searchPoiInfo;
-//                XMLParser parser = new XMLParser();
-//                NaverMovies movies = parser.fromXml(response.body().byteStream(), "channel", NaverMovies.class);
-//                callbackObject.result = movies;
+                Gson gson = new GsonBuilder().registerTypeAdapter(Geometry.class, new GeometryDeserializer()).create();
+                CarRouteInfo result = gson.fromJson(response.body().charStream(), CarRouteInfo.class);
+                callbackObject.result = result;
                 Message msg = mHandler.obtainMessage(MESSAGE_SUCCESS, callbackObject);
                 mHandler.sendMessage(msg);
             }
@@ -222,10 +277,6 @@ public class NetworkManager {
 
         return request;
 
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        return null;
     }
 
 //    private static final String URL_FORMAT = "https://openapi.naver.com/v1/search/movie.xml?target=movie&query=%s&start=%s&display=%s";
